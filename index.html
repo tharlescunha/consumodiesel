@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrar Consumo de Diesel</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        .container {
+            max-width: 500px;
+            margin-top: 20px;
+        }
+
+        .header {
+            background-color: #007bff;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+
+        .form-control-dark {
+            background-color: #343a40;
+            color: #ffffff;
+        }
+
+        .form-control {
+            font-size: 1.1em;
+        }
+
+        .form-control-black {
+            color: #000000;
+        }
+
+        .invalid-feedback {
+            display: block;
+        }
+
+        #loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        #loading .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            border-width: 0.3em;
+        }
+
+        #tabelaOffline {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            Registrar Consumo de Diesel NSR-3510
+        </div>
+        <form id="dieselForm">
+            <div class="form-group">
+                <label for="equipamento">Equipamento</label>
+                <select class="form-control" id="equipamento" required>
+                    <option value="">Selecione o equipamento</option>
+                    <option value="Gerador 01">Gerador 01</option>
+                    <option value="Gerador 02">Gerador 02</option>
+                    <option value="Gerador 03">Gerador 04</option>
+                    <option value="Gerador 04 pequeno">Gerador 04 pequeno</option>
+                </select>
+                <div class="invalid-feedback">Selecione um equipamento.</div>
+            </div>
+            <div class="form-group">
+                <label for="horasAtualEquipamento">Horas Atual do Equipamento</label>
+                <input type="text" class="form-control" id="horasAtualEquipamento" placeholder="Ex: 132,4" maxlength="6"
+                    required>
+                <div class="invalid-feedback">As horas atuais devem ser preenchidas.</div>
+            </div>
+            <div class="form-group">
+                <label for="nivelInicial">Nível Inicial (cm)</label>
+                <input type="text" class="form-control" id="nivelInicial" placeholder="Digite o nível inicial" maxlength="6" required>
+                <div class="invalid-feedback">O nível inicial deve ser preenchido.</div>
+            </div>
+            <div class="form-group">
+                <label for="nivelFinal">Nível Final (cm)</label>
+                <input type="text" class="form-control" id="nivelFinal" placeholder="Digite o nível final" maxlength="6" required>
+                <div class="invalid-feedback">O nível final deve ser preenchido e não pode ser maior que o nível inicial.</div>
+            </div>
+            <div class="form-group">
+                <label for="consumo">Litros Consumido</label>
+                <input type="text" class="form-control form-control-dark form-control-black" id="consumo" readonly>
+            </div>
+            <button type="button" class="btn btn-primary btn-block" id="enviarButton" onclick="enviarDados()">Enviar</button>
+            <div id="loading">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">Carregando...</span>
+                </div>
+            </div>
+        </form>
+
+        <!-- Tabela para mostrar os dados salvos localmente -->
+        <div id="tabelaOffline">
+            <h5>Dados não enviados</h5>
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Equipamento</th>
+                        <th>Horas Atual</th>
+                        <th>Litros</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody id="offlineDataBody">
+                    <!-- Dados offline serão inseridos aqui -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function formatarHoras(event) {
+            const valor = event.target.value.replace(/\D/g, '');
+            const regex = /^\d{0,5}(,\d{0,1})?$/;
+
+            if (regex.test(valor)) {
+                const parteInteira = valor.slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                const parteDecimal = valor.slice(-1);
+                event.target.value = parteInteira + "," + parteDecimal;
+            } else {
+                event.target.value = valor.slice(0, -1);
+            }
+        }
+
+        document.getElementById('horasAtualEquipamento').addEventListener('input', formatarHoras);
+
+        function formatarNumero(numero) {
+            return numero.toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function calcularconsumo() {
+            var nivelInicial = parseFloat(document.getElementById('nivelInicial').value.replace(/\./g, '').replace(',', '.')) || 0;
+            var nivelFinal = parseFloat(document.getElementById('nivelFinal').value.replace(/\./g, '').replace(',', '.')) || 0;
+            var consumo = calcularValor(nivelInicial / 100) - calcularValor(nivelFinal / 100);
+
+            if (nivelFinal >= nivelInicial) {
+                document.getElementById('consumo').value = '';
+                document.getElementById('enviarButton').disabled = true;
+            } else {
+                document.getElementById('consumo').value = formatarNumero(consumo);
+                document.getElementById('enviarButton').disabled = false;
+            }
+        }
+
+        function validarCampos() {
+            var nivelInicial = parseFloat(document.getElementById('nivelInicial').value.replace(/\./g, '').replace(',', '.')) || 0;
+            var nivelFinal = parseFloat(document.getElementById('nivelFinal').value.replace(/\./g, '').replace(',', '.')) || 0;
+
+            var camposPreenchidos = nivelInicial > 0 && !isNaN(nivelInicial) && nivelFinal > 0 && !isNaN(nivelFinal);
+            var nivelFinalValido = nivelFinal < nivelInicial;
+
+            document.getElementById('nivelInicial').classList.toggle('is-invalid', !camposPreenchidos);
+            document.getElementById('nivelFinal').classList.toggle('is-invalid', !camposPreenchidos || !nivelFinalValido);
+
+            calcularconsumo();
+        }
+
+        function formatarCampo(event) {
+            var valor = event.target.value.replace(/\D/g, '');
+            var numero = parseFloat(valor) / 100;
+            if (!isNaN(numero)) {
+                event.target.value = formatarNumero(numero).replace('.', ',');
+                validarCampos();
+            }
+        }
+
+        function calcularValor(I4) {
+            const pi = 3.141592653;
+            const raio = 1.91 / 2;
+            const multiplicador = 5.53 * 1000;
+
+            const parte1 = (pi / 2) * (raio ** 2);
+            const parte2 = raio ** 2 * Math.asin(-(I4 - raio) / raio);
+            const parte3 = (I4 - raio) * Math.sqrt((raio ** 2) - ((I4 - raio) ** 2));
+
+            const resultado = (parte1 - parte2 + parte3) * multiplicador;
+
+            return resultado;
+        }
+
+        document.getElementById('nivelInicial').addEventListener('input', formatarCampo);
+        document.getElementById('nivelFinal').addEventListener('input', formatarCampo);
+
+        document.getElementById('nivelInicial').addEventListener('input', validarEntrada);
+        document.getElementById('nivelFinal').addEventListener('input', validarEntrada);
+
+        function mostrarLoading(estado) {
+            document.getElementById('loading').style.display = estado ? 'block' : 'none';
+            document.getElementById('enviarButton').disabled = estado;
+        }
+
+        function validarEntrada(event) {
+            const valor = event.target.value;
+            const regex = /^\d{0,3}(,\d{0,2})?$/;
+
+            if (!regex.test(valor)) {
+                event.target.value = valor.slice(0, -1);  // Remove o último caractere se não corresponder ao formato
+            }
+        }
+
+        function enviarDados() {
+            var dataRegistro = obterDataAtual();
+            var filial = 'NSR-3510'; // Certifique-se de que essa variável está definida antes de chamar a função
+            var equipamento = document.getElementById('equipamento').value;
+            var horasAtualEquipamento = document.getElementById('horasAtualEquipamento').value.replace('.', '').replace(',', '.');
+            var nivelInicial = document.getElementById('nivelInicial').value.replace('.', '').replace(',', '.');
+            var nivelFinal = document.getElementById('nivelFinal').value.replace('.', '').replace(',', '.');
+            var consumo = document.getElementById('consumo').value;
+
+            if (equipamento && horasAtualEquipamento && nivelInicial && nivelFinal) {
+                mostrarLoading(true);
+
+                // Salva os dados localmente para envio posterior, se falhar
+                const data = {
+                    filial,
+                    equipamento,
+                    horasAtualEquipamento,
+                    nivelInicial,
+                    nivelFinal,
+                    consumo,
+                    dataRegistro
+                };
+
+                try {
+                    fetch('https://prod-132.westus.logic.azure.com:443/workflows/001d624088f0454e95ac8385e6e4031e/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=hCv0pPzjswI8yAVE26nKpILZhtnktV92zKWxWtrhkDg', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    }).then(response => {
+                        if (!response.ok) throw new Error('Erro ao enviar os dados.');
+                        return response.json();
+                    }).then(result => {
+                        mostrarLoading(false);
+                        alert('Dados enviados com sucesso!');
+                        // Limpar os campos após o envio bem-sucedido
+                        document.getElementById('dieselForm').reset();
+                        document.getElementById('consumo').value = '';
+                    }).catch(error => {
+                        salvarOffline(data);
+                        mostrarLoading(false);
+                        alert('Sem internet! os dados foram salvo no celular, envie quando tiver internet.');
+                        // Limpar os campos após o envio bem-sucedido
+                        document.getElementById('dieselForm').reset();
+                        document.getElementById('consumo').value = '';
+                    });
+                } catch (error) {
+                    salvarOffline(data);
+                    console.log(data)
+                    console.log(error)
+
+                    mostrarLoading(false);
+                    alert('Sem internet! os dados foram salvo no celular, envie quando tiver internet.');
+                    // Limpar os campos após o envio bem-sucedido
+                    document.getElementById('dieselForm').reset();
+                    document.getElementById('consumo').value = '';
+                }
+            }
+        }
+
+        function salvarOffline(data) {
+            let dadosOffline = JSON.parse(localStorage.getItem('dadosOffline')) || [];
+            dadosOffline.push(data);
+            localStorage.setItem('dadosOffline', JSON.stringify(dadosOffline));
+            atualizarTabelaOffline();
+        }
+
+        function atualizarTabelaOffline() {
+            let dadosOffline = JSON.parse(localStorage.getItem('dadosOffline')) || [];
+            const tabelaBody = document.getElementById('offlineDataBody');
+            tabelaBody.innerHTML = '';
+
+            dadosOffline.forEach((item, index) => {
+                const linha = document.createElement('tr');
+                linha.innerHTML = `
+                    <td>${item.equipamento}</td>
+                    <td>${item.horasAtualEquipamento}</td>
+                    <td>${item.consumo}</td>
+                    <td><button class="btn btn-success btn-sm" onclick="enviarOffline(${index})">Enviar</button></td>
+                `;
+                tabelaBody.appendChild(linha);
+            });
+        }
+
+        function enviarOffline(index) {
+            let dadosOffline = JSON.parse(localStorage.getItem('dadosOffline')) || [];
+            const data = dadosOffline[index];
+
+            fetch('https://prod-132.westus.logic.azure.com:443/workflows/001d624088f0454e95ac8385e6e4031e/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=hCv0pPzjswI8yAVE26nKpILZhtnktV92zKWxWtrhkDg', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            }).then(response => {
+                if (!response.ok) throw new Error('Erro ao enviar os dados.');
+                return response.json();
+            }).then(result => {
+                dadosOffline.splice(index, 1);
+                localStorage.setItem('dadosOffline', JSON.stringify(dadosOffline));
+                atualizarTabelaOffline();
+                alert('Dados enviados com sucesso!');
+                document.getElementById('dieselForm').reset();
+                document.getElementById('consumo').value = '';
+            }).catch(error => {
+                console.error('Erro:', error);
+                alert('Falha no envio. Tente novamente mais tarde.');
+            });
+        }
+
+        window.onload = function () {
+            atualizarTabelaOffline();
+        }
+
+        function obterDataAtual() {
+            // Cria um novo objeto Date com a data e hora atuais
+            var hoje = new Date();
+
+            // Obtém o dia, mês e ano
+            var dia = hoje.getDate();        // 1-31
+            var mes = hoje.getMonth() + 1;   // 0-11 (Janeiro é 0, então adicionamos 1)
+            var ano = hoje.getFullYear();    // 4 dígitos (por exemplo, 2024)
+
+            // Formata o dia e o mês para ter dois dígitos
+            if (dia < 10) dia = '0' + dia;
+            if (mes < 10) mes = '0' + mes;
+
+            // Concatena dia, mês e ano no formato dd/mm/aaaa
+            var dataFormatada = dia + '/' + mes + '/' + ano;
+
+            return dataFormatada;
+        }
+
+    </script>
+</body>
+
+</html>

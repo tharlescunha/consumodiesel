@@ -81,12 +81,12 @@
             </div>
             <div class="form-group">
                 <label for="nivelInicial">Nível Inicial (cm)</label>
-                <input type="text" class="form-control" id="nivelInicial" placeholder="Digite o nível inicial" maxlength="6" required>
+                <input type="text" class="form-control" id="nivelInicial" placeholder="Digite o nível inicial" maxlength="5" required>
                 <div class="invalid-feedback">O nível inicial deve ser preenchido.</div>
             </div>
             <div class="form-group">
                 <label for="nivelFinal">Nível Final (cm)</label>
-                <input type="text" class="form-control" id="nivelFinal" placeholder="Digite o nível final" maxlength="6" required>
+                <input type="text" class="form-control" id="nivelFinal" placeholder="Digite o nível final" maxlength="5" required>
                 <div class="invalid-feedback">O nível final deve ser preenchido e não pode ser maior que o nível inicial.</div>
             </div>
             <div class="form-group">
@@ -144,16 +144,33 @@
         }
 
         function calcularconsumo() {
-            var nivelInicial = parseFloat(document.getElementById('nivelInicial').value.replace(/\./g, '').replace(',', '.')) || 0;
-            var nivelFinal = parseFloat(document.getElementById('nivelFinal').value.replace(/\./g, '').replace(',', '.')) || 0;
-            var consumo = calcularValor(nivelInicial / 100) - calcularValor(nivelFinal / 100);
+            // Obter os valores e garantir que a vírgula seja substituída por ponto
+            var nivelInicialStr = document.getElementById('nivelInicial').value.replace(/\./g, '').replace(',', '');
+            var nivelFinalStr = document.getElementById('nivelFinal').value.replace(/\./g, '').replace(',', '');
+
+            // Converter para float e garantir precisão
+            var nivelInicial = parseFloat(nivelInicialStr);
+            var nivelFinal = parseFloat(nivelFinalStr);
+
+            // Garantir que os valores não sejam NaN, caso o input esteja vazio ou inválido
+            nivelInicial = isNaN(nivelInicial) ? 0 : nivelInicial/100;
+            nivelFinal = isNaN(nivelFinal) ? 0 : nivelFinal/100;
+
+
+            var consumo = calcularValor(nivelInicial / 10) - calcularValor(nivelFinal / 10);
 
             if (nivelFinal >= nivelInicial) {
-                document.getElementById('consumo').value = '';
+                alert("Medida depois do abastecimento ta maior que a medida de antes.");
+                document.getElementById('consumo').value = 'Revise o número digitado.';
                 document.getElementById('enviarButton').disabled = true;
             } else {
-                document.getElementById('consumo').value = formatarNumero(consumo);
-                document.getElementById('enviarButton').disabled = false;
+                if (formatarNumero(consumo) === "NaN") {
+                    document.getElementById('enviarButton').disabled = true;
+                    document.getElementById('consumo').value = "Revise o número digitado.";
+                }else {
+                    document.getElementById('consumo').value = formatarNumero(consumo);
+                    document.getElementById('enviarButton').disabled = false;
+                }
             }
         }
 
@@ -205,14 +222,24 @@
         }
 
         function validarEntrada(event) {
-            const valor = event.target.value;
-            const regex = /^\d{0,3}(,\d{0,2})?$/;
-
-            if (!regex.test(valor)) {
-                event.target.value = valor.slice(0, -1);  // Remove o último caractere se não corresponder ao formato
+            let valor = event.target.value;
+            
+            // Remove qualquer caractere que não seja número
+            valor = valor.replace(/[^0-9]/g, '');
+            
+            // Limita o valor a 4 dígitos
+            if (valor.length > 4) {
+                valor = valor.slice(0, 4);
             }
+            
+            // Insere a vírgula na posição correta
+            if (valor.length > 1) {
+                valor = valor.slice(0, valor.length - 1) + ',' + valor.slice(-1);
+            }
+            
+            // Atualiza o valor do campo
+            event.target.value = valor;
         }
-
         function enviarDados() {
             var dataRegistro = obterDataAtual();
             var filial = 'NSR-3510'; // Certifique-se de que essa variável está definida antes de chamar a função
